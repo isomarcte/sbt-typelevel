@@ -40,7 +40,6 @@ object TypelevelVersioningPlugin extends AutoPlugin {
   import autoImport._
 
   override def buildSettings: Seq[Setting[_]] = Seq(
-    versionScheme := Some("early-semver"),
     tlVUntaggedAreSnapshots := true,
     isSnapshot := {
       val isUntagged = getTaggedVersion(versionScheme.value, git.gitCurrentTags.value).isEmpty

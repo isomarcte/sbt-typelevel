@@ -1,6 +1,8 @@
 name := "sbt-typelevel"
 
-ThisBuild / tlBaseVersion := "0.4"
+ThisBuild / tlVBaseVersion := "0.4"
+ThisBuild / versionScheme := Some("early-semver")
+
 ThisBuild / crossScalaVersions := Seq("2.12.15")
 ThisBuild / developers := List(
   tlGitHubDev("armanbilge", "Arman Bilge"),
@@ -8,7 +10,6 @@ ThisBuild / developers := List(
   tlGitHubDev("ChristopherDavenport", "Christopher Davenport"),
   tlGitHubDev("djspiewak", "Daniel Spiewak")
 )
-
 lazy val root = tlCrossRootProject.aggregate(
   kernel,
   noPublish,
