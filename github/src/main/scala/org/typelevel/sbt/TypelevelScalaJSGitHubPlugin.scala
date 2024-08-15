@@ -32,7 +32,8 @@ object TypelevelScalaJSGitHubPlugin extends AutoPlugin {
       val flag = if (tlIsScala3.value) "-scalajs-mapSourceURI:" else "-P:scalajs:mapSourceURI:"
 
       val tagOrHash =
-        GitHelper.getTagOrHash(git.gitCurrentTags.value, git.gitHeadCommit.value)
+        GitHelper
+          .getTagOrHash(versionScheme.value, git.gitCurrentTags.value, git.gitHeadCommit.value)
 
       val l = (LocalRootProject / baseDirectory).value.toURI.toString
 

@@ -19,7 +19,7 @@ package org.typelevel.sbt
 import sbt._, Keys._
 import com.typesafe.sbt.GitPlugin
 import com.typesafe.sbt.SbtGit.git
-import org.typelevel.sbt.kernel.V
+import org.typelevel.sbt.kernel.SemV
 import org.typelevel.sbt.kernel.GitHelper
 
 object TypelevelSettingsPlugin extends AutoPlugin {
@@ -61,7 +61,7 @@ object TypelevelSettingsPlugin extends AutoPlugin {
       "-unchecked"),
     scalacOptions ++= {
       scalaVersion.value match {
-        case V(V(2, minor, _, _)) if minor < 13 =>
+        case SemV(SemV(2, minor, _, _)) if minor < 13 =>
           Seq("-Yno-adapted-args", "-Ywarn-unused-import")
         case _ =>
           Seq.empty
@@ -101,16 +101,16 @@ object TypelevelSettingsPlugin extends AutoPlugin {
       val warningsDotty = Seq()
 
       scalaVersion.value match {
-        case V(V(3, _, _, _)) =>
+        case SemV(SemV(3, _, _, _)) =>
           warningsDotty
 
-        case V(V(2, minor, _, _)) if minor >= 13 =>
+        case SemV(SemV(2, minor, _, _)) if minor >= 13 =>
           (warnings211 ++ warnings212 ++ warnings213 ++ warningsNsc).filterNot(removed213)
 
-        case V(V(2, minor, _, _)) if minor >= 12 =>
+        case SemV(SemV(2, minor, _, _)) if minor >= 12 =>
           warnings211 ++ warnings212 ++ warningsNsc
 
-        case V(V(2, minor, _, _)) if minor >= 11 =>
+        case SemV(SemV(2, minor, _, _)) if minor >= 11 =>
           warnings211 ++ warningsNsc
 
         case _ => Seq.empty
@@ -118,10 +118,10 @@ object TypelevelSettingsPlugin extends AutoPlugin {
     },
     scalacOptions ++= {
       scalaVersion.value match {
-        case V(V(2, 12, _, _)) =>
+        case SemV(SemV(2, 12, _, _)) =>
           Seq("-Ypartial-unification")
 
-        case V(V(2, 11, Some(build), _)) if build >= 11 =>
+        case SemV(SemV(2, 11, Some(build), _)) if build >= 11 =>
           Seq("-Ypartial-unification")
 
         case _ =>
@@ -133,10 +133,10 @@ object TypelevelSettingsPlugin extends AutoPlugin {
       val settings = Seq(s"-Ybackend-parallelism", scala.math.min(16, numCPUs).toString)
 
       scalaVersion.value match {
-        case V(V(2, 12, Some(build), _)) if build >= 5 =>
+        case SemV(SemV(2, 12, Some(build), _)) if build >= 5 =>
           settings
 
-        case V(V(2, 13, _, _)) =>
+        case SemV(SemV(2, 13, _, _)) =>
           settings
 
         case _ =>
@@ -176,7 +176,10 @@ object TypelevelSettingsPlugin extends AutoPlugin {
       else {
 
         val tagOrHash =
-          GitHelper.getTagOrHash(git.gitCurrentTags.value, git.gitHeadCommit.value)
+          GitHelper.getTagOrHash(
+            versionScheme.value,
+            git.gitCurrentTags.value,
+            git.gitHeadCommit.value)
 
         val infoOpt = scmInfo.value
         tagOrHash.toSeq flatMap { vh =>

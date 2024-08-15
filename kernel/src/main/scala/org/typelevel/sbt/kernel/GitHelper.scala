@@ -27,17 +27,34 @@ private[sbt] object GitHelper {
    * @param fromHead
    *   if `true`, only tags reachable from HEAD's history. If `false`, all tags in the repo.
    */
-  def previousReleases(fromHead: Boolean = false): List[V] = {
+  def previousReleases(
+      versionScheme: Option[String],
+      fromHead: Boolean = false): List[VersionType] = {
     Try {
       val merged = if (fromHead) " --merged HEAD" else ""
       // --no-contains omits tags on HEAD
-      s"git tag --no-contains HEAD$merged".!!.split("\n").toList.map(_.trim).collect {
-        case V.Tag(version) => version
+      val l = s"git tag --no-contains HEAD$merged".!!.split("\n").toList.map(_.trim)
+      versionScheme match {
+        case Some("early-semver") =>
+          l.collect { case SemV.Tag(version) => version }.sorted.reverse
+        case Some("pvp") => l.collect { case PVPV.Tag(version) => version }.sorted.reverse
+        case Some(s) => sys.error(s"unsupported version scheme $s")
+        case None => Nil
       }
-    }.getOrElse(List.empty).sorted.reverse
+    }.getOrElse(List.empty)
   }
 
-  def getTagOrHash(tags: Seq[String], hash: Option[String]): Option[String] =
-    tags.collect { case v @ V.Tag(_) => v }.headOption.orElse(hash)
+  def getTagOrHash(
+      versionScheme: Option[String],
+      tags: Seq[String],
+      hash: Option[String]): Option[String] =
+    versionScheme.flatMap {
+      _ match {
+        case "early-semver" =>
+          tags.collect { case v @ SemV.Tag(_) => v }.headOption.orElse(hash)
+        case "pvp" => tags.collect { case v @ SemV.Tag(_) => v }.headOption.orElse(hash)
+        case s => sys.error(s"unsupported version scheme $s")
+      }
 
+    }
 }

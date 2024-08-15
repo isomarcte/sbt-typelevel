@@ -20,7 +20,7 @@ import sbt._, Keys._
 import com.typesafe.tools.mima.plugin.MimaPlugin
 import MimaPlugin.autoImport._
 import org.typelevel.sbt.kernel.GitHelper
-import org.typelevel.sbt.kernel.V
+import org.typelevel.sbt.kernel.SemV
 
 object TypelevelMimaPlugin extends AutoPlugin {
 
@@ -44,20 +44,25 @@ object TypelevelMimaPlugin extends AutoPlugin {
     mimaPreviousArtifacts := {
       require(
         versionScheme.value.contains("early-semver"),
-        "Only early-semver versioning scheme supported.")
+        "Only early-semver or pvp versioning scheme supported.")
       if (publishArtifact.value) {
-        val current = V(version.value)
+        val current = SemV(version.value)
           // Consider it as a real release, for purposes of compat-checking
           .map(_.copy(prerelease = None))
           .getOrElse(sys.error(s"Version must be semver format: ${version.value}"))
         val introduced = tlVersionIntroduced
           .value
           .get(scalaBinaryVersion.value)
-          .map(v => V(v).getOrElse(sys.error(s"Version must be semver format: $v")))
+          .map(v => SemV(v).getOrElse(sys.error(s"Version must be semver format: $v")))
         val previous = GitHelper
-          .previousReleases()
+          .previousReleases(versionScheme.value)
           .filterNot(_.isPrerelease)
-          .filter(v => introduced.forall(v >= _))
+          .filter(v =>
+            introduced.forall(x =>
+              v match {
+                case semv: SemV => semv >= x
+                case _ => sys.error("Version must be semver format")
+              }))
           .filter(current.mustBeBinCompatWith(_))
         previous
           .map(v =>
