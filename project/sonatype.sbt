@@ -1,1 +1,0 @@
-../sonatype/build.sbt
