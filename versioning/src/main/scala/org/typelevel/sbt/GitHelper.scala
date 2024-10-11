@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.typelevel.sbt.kernel
+package io.isomarcte.sbt
 
 import scala.util.Try
 

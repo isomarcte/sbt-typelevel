@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package org.typelevel.sbt
+package io.isomarcte.sbt
 
 import sbt._, Keys._
-import com.typesafe.sbt.GitPlugin
-import com.typesafe.sbt.SbtGit.git
-import org.typelevel.sbt.kernel.{PVPV, SemV, VersionType}
-
+import com.github.sbt.git.GitPlugin
+import com.github.sbt.git.SbtGit.git
 import scala.util.Try
-import org.typelevel.sbt.kernel.GitHelper
 
-object TypelevelVersioningPlugin extends AutoPlugin {
+object TypelevelVersioningPluginWithPVP extends AutoPlugin {
 
   override def requires = GitPlugin
   override def trigger = allRequirements
