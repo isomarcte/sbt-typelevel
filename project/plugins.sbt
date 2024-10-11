@@ -1,1 +1,12 @@
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
+
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-no-publish" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-ci" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-ci-signing" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-github-actions" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-github" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-mima" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-sonatype" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-scalafix" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel-sonatype-ci-release" % "0.7.3")
+addSbtPlugin("org.typelevel"  % "sbt-typelevel" % "0.7.3")

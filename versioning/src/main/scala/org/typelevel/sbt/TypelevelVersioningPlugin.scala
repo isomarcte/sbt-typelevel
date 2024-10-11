@@ -14,25 +14,22 @@
  * limitations under the License.
  */
 
-package org.typelevel.sbt
+package io.isomarcte.sbt
 
 import sbt._, Keys._
-import com.typesafe.sbt.GitPlugin
-import com.typesafe.sbt.SbtGit.git
-import org.typelevel.sbt.kernel.V
-
+import com.github.sbt.git.GitPlugin
+import com.github.sbt.git.SbtGit.git
 import scala.util.Try
-import org.typelevel.sbt.kernel.GitHelper
 
-object TypelevelVersioningPlugin extends AutoPlugin {
+object TypelevelVersioningPluginWithPVP extends AutoPlugin {
 
   override def requires = GitPlugin
   override def trigger = allRequirements
 
   object autoImport {
-    lazy val tlBaseVersion =
+    lazy val tlVBaseVersion =
       settingKey[String]("The base version for the series your project is in. e.g., 0.2, 3.5")
-    lazy val tlUntaggedAreSnapshots =
+    lazy val tlVUntaggedAreSnapshots =
       settingKey[Boolean](
         "If true, an untagged commit is given a snapshot version, e.g. 0.4-00218f9-SNAPSHOT. If false, it is given a release version, e.g. 0.4-00218f9. (default: true)")
   }
@@ -40,12 +37,11 @@ object TypelevelVersioningPlugin extends AutoPlugin {
   import autoImport._
 
   override def buildSettings: Seq[Setting[_]] = Seq(
-    versionScheme := Some("early-semver"),
-    tlUntaggedAreSnapshots := true,
+    tlVUntaggedAreSnapshots := true,
     isSnapshot := {
-      val isUntagged = getTaggedVersion(git.gitCurrentTags.value).isEmpty
+      val isUntagged = getTaggedVersion(versionScheme.value, git.gitCurrentTags.value).isEmpty
       val dirty = git.gitUncommittedChanges.value
-      dirty || (isUntagged && tlUntaggedAreSnapshots.value)
+      dirty || (isUntagged && tlVUntaggedAreSnapshots.value)
     },
     git.gitCurrentTags := {
       // https://docs.github.com/en/actions/learn-github-actions/environment-variables
@@ -53,9 +49,20 @@ object TypelevelVersioningPlugin extends AutoPlugin {
       if (sys.env.get("GITHUB_REF_TYPE").exists(_ == "branch"))
         // we are running in a workflow job that was *not* triggered by a tag
         // so, we discard tags that would affect our versioning
-        git.gitCurrentTags.value.flatMap {
-          case V.Tag(_) => None
-          case other => Some(other)
+        git.gitCurrentTags.value.flatMap { value =>
+          versionScheme.value match {
+            case Some("early-semver") =>
+              value match {
+                case SemV.Tag(_) => None
+                case other => Some(other)
+              }
+            case Some("pvp") =>
+              value match {
+                case PVPV.Tag(_) => None
+                case other => Some(other)
+              }
+            case _ => sys.error(s"Unsupported versionScheme")
+          }
         }
       else
         git.gitCurrentTags.value
@@ -63,37 +70,56 @@ object TypelevelVersioningPlugin extends AutoPlugin {
     version := {
       import scala.sys.process._
 
-      var version = getTaggedVersion(git.gitCurrentTags.value).map(_.toString).getOrElse {
-        // No tag, so we build our version based on this commit
+      var version = getTaggedVersion(versionScheme.value, git.gitCurrentTags.value)
+        .map(_.toString)
+        .getOrElse {
+          // No tag, so we build our version based on this commit
 
-        val baseV = V(tlBaseVersion.value)
-          .getOrElse(sys.error(s"tlBaseVersion must be semver format: ${tlBaseVersion.value}"))
+          val mbaseV: Option[VersionType] = versionScheme.value match {
+            case Some("early-semver") => SemV(tlVBaseVersion.value)
+            case Some("pvp") => PVPV(tlVBaseVersion.value)
+            case _ => sys.error(s"Unsupported versionScheme")
+          }
+          val baseV = mbaseV.getOrElse(
+            sys.error(s"tlBaseVersion must be semver format: ${tlVBaseVersion.value}"))
 
-        val latestInSeries = GitHelper
-          .previousReleases(true)
-          .filterNot(_.isPrerelease) // TODO Ordering of pre-releases is arbitrary
-          .headOption
-          .flatMap { previous =>
-            if (previous > baseV)
-              sys.error(s"Your tlBaseVersion $baseV is behind the latest tag $previous")
-            else if (baseV.isSameSeries(previous))
-              Some(previous)
-            else
-              None
+          val latestInSeries = GitHelper
+            .previousReleases(versionScheme.value, true)
+            .filterNot(_.isPrerelease) // TODO Ordering of pre-releases is arbitrary
+            .headOption
+            .flatMap { previous =>
+              (previous, baseV) match {
+                case (prev: SemV, bV: SemV) =>
+                  if (prev > bV)
+                    sys.error(s"Your tlBaseVersion $baseV is behind the latest tag $previous")
+                  else if (bV.isSameSeries(previous))
+                    Some(previous)
+                  else
+                    None
+                case (prev: PVPV, bV: PVPV) =>
+                  if (prev > bV)
+                    sys.error(s"Your tlBaseVersion $baseV is behind the latest tag $previous")
+                  else if (bV.isSameSeries(previous))
+                    Some(previous)
+                  else
+                    None
+                case _ => sys.error(s"Unsupported versioning type matching")
+
+              }
+            }
+
+          var version = latestInSeries.fold(tlVBaseVersion.value)(_.toString)
+
+          // Looks for the distance to latest release in this series
+          latestInSeries.foreach { latestInSeries =>
+            Try(s"git describe --tags --match v$latestInSeries".!!.trim)
+              .collect { case Description(distance) => distance }
+              .foreach { distance => version += s"-$distance" }
           }
 
-        var version = latestInSeries.fold(tlBaseVersion.value)(_.toString)
-
-        // Looks for the distance to latest release in this series
-        latestInSeries.foreach { latestInSeries =>
-          Try(s"git describe --tags --match v$latestInSeries".!!.trim)
-            .collect { case Description(distance) => distance }
-            .foreach { distance => version += s"-$distance" }
+          git.gitHeadCommit.value.foreach { sha => version += s"-${sha.take(7)}" }
+          version
         }
-
-        git.gitHeadCommit.value.foreach { sha => version += s"-${sha.take(7)}" }
-        version
-      }
 
       // Even if version was provided by a tag, we check for uncommited changes
       if (git.gitUncommittedChanges.value) {
@@ -112,7 +138,11 @@ object TypelevelVersioningPlugin extends AutoPlugin {
 
   private val Description = """^.*-(\d+)-[a-zA-Z0-9]+$""".r
 
-  private def getTaggedVersion(tags: Seq[String]): Option[V] =
-    tags.collect { case V.Tag(v) => v }.headOption
+  private def getTaggedVersion(vs: Option[String], tags: Seq[String]): Option[VersionType] =
+    vs match {
+      case Some("early-semver") => tags.collect { case SemV.Tag(v) => v }.headOption
+      case Some("pvp") => tags.collect { case PVPV.Tag(v) => v }.headOption
+      case a => sys.error(s"unsupported versionScheme $a")
+    }
 
 }
